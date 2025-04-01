@@ -17,8 +17,10 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "your_channel
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your_channel_secret")
 
 # 初始化 Line Bot (v3)
-configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
-line_bot_api = MessagingApi(configuration)  # 直接初始化 MessagingApi
+configuration = Configuration()
+configuration.access_token = LINE_CHANNEL_ACCESS_TOKEN
+configuration.host = "https://api.line.me"  # 確保設置正確的 API 主機
+line_bot_api = MessagingApi(configuration)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # 儲存用戶 ID（用於推播）
