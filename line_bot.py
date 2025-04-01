@@ -23,8 +23,8 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your_channel_secret")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 儲存用戶 ID（用於推播）
-user_ids = []
+# 儲存 OpenChat 的 chatId（用於推播）
+chat_ids = []
 
 # 幽默的碎碎念訊息列表
 funny_messages = [
@@ -55,12 +55,17 @@ def callback():
 # 處理用戶發送的訊息
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_id = event.source.user_id
-    if user_id not in user_ids:
-        user_ids.append(user_id)  # 儲存用戶 ID 用於推播
+    # 檢查是否來自 OpenChat
+    if event.source.type == "group" or event.source.type == "room":
+        chat_id = event.source.group_id if event.source.type == "group" else event.source.room_id
+        if chat_id not in chat_ids:
+            chat_ids.append(chat_id)  # 儲存 OpenChat 的 chatId 用於推播
+            logger.info(f"Added chatId {chat_id} to chat_ids")
 
+    user_id = event.source.user_id if event.source.type == "user" else None
+    chat_id = event.source.group_id if event.source.type == "group" else event.source.room_id if event.source.type == "room" else None
     user_message = event.message.text.lower()
-    logger.info(f"Received message from user {user_id}: {user_message}")
+    logger.info(f"Received message from user {user_id} in chat {chat_id}: {user_message}")
     if "滷小 small" in user_message:
         reply_text = "我是滷小 SMALL！今天要一起完成什麼任務呢？😋 快告訴我吧～🍖"
     elif "任務" in user_message:
@@ -71,26 +76,28 @@ def handle_message(event):
         reply_text = "滷小 SMALL 聽不懂啦～請說『滷小 SMALL』、『任務』或『滷肉飯』來跟我互動吧！🍖"
 
     # 使用 LineBotApi 發送回覆訊息
-    logger.info(f"Replying to user {user_id} with: {reply_text}")
+    logger.info(f"Replying to chat {chat_id} with: {reply_text}")
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply_text)
     )
 
-# 定時推播訊息
+# 定時推播訊息到 OpenChat
 def push_message():
-    if user_ids:  # 確保有用戶 ID
+    if chat_ids:  # 確保有 chatId
         message = random.choice(funny_messages)  # 隨機選擇一條幽默訊息
-        for user_id in user_ids:
-            logger.info(f"Pushing message to user {user_id}: {message}")
+        for chat_id in chat_ids:
+            logger.info(f"Pushing message to chat {chat_id}: {message}")
             line_bot_api.push_message(
-                user_id,
+                chat_id,
                 TextSendMessage(text=message)
             )
+    else:
+        logger.warning("No chat_ids available for push message")
 
-# 排程定時推播（每天 12:00 和 18:00 推播）
-schedule.every().day.at("12:00").do(push_message)
-schedule.every().day.at("18:00").do(push_message)
+# 排程定時推播（以 UTC 時間為基準，對應台灣時間 12:00 和 18:00）
+schedule.every().day.at("04:00").do(push_message)  # 台灣時間 12:00 (UTC 04:00)
+schedule.every().day.at("10:00").do(push_message)  # 台灣時間 18:00 (UTC 10:00)
 
 # 啟動排程的背景執行緒
 def run_schedule():
