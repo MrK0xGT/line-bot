@@ -1,7 +1,9 @@
 from flask import Flask, request, abort
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.v3.messaging import MessagingApi, Configuration, ReplyMessageRequest
+from linebot.v3.webhook import WebhookHandler
+from linebot.v3.exceptions import InvalidSignatureError
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.v3.messaging import TextMessage
 import schedule
 import time
 import threading
@@ -19,8 +21,11 @@ logger = logging.getLogger(__name__)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "your_channel_access_token")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your_channel_secret")
 
-# 初始化 Line Bot
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+# 初始化 Line Bot (v3)
+configuration = Configuration(
+    access_token=LINE_CHANNEL_ACCESS_TOKEN
+)
+line_bot_api = MessagingApi(configuration)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # 儲存用戶 ID（用於推播）
@@ -53,7 +58,7 @@ def callback():
     return 'OK'
 
 # 處理用戶發送的訊息
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     user_id = event.source.user_id
     if user_id not in user_ids:
@@ -70,11 +75,13 @@ def handle_message(event):
     else:
         reply_text = "滷小 SMALL 聽不懂啦～請說『滷小 SMALL』、『任務』或『滷肉飯』來跟我互動吧！🍖"
 
-    # 使用 LineBotApi 發送回覆訊息
+    # 使用 MessagingApi 發送回覆訊息
     logger.info(f"Replying to user {user_id} with: {reply_text}")
     line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=reply_text)
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text=reply_text)]
+        )
     )
 
 # 定時推播訊息
@@ -84,8 +91,10 @@ def push_message():
         for user_id in user_ids:
             logger.info(f"Pushing message to user {user_id}: {message}")
             line_bot_api.push_message(
-                user_id,
-                TextSendMessage(text=message)
+                PushMessageRequest(
+                    to=user_id,
+                    messages=[TextMessage(text=message)]
+                )
             )
 
 # 排程定時推播（每天 12:00 和 18:00 推播）
