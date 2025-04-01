@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
+from linebot.v3.messaging import MessagingApi, Configuration
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
@@ -18,7 +18,7 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your_channel_secret")
 
 # 初始化 Line Bot (v3)
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
-line_bot_api = ApiClient(configuration, MessagingApi)
+line_bot_api = MessagingApi(configuration)  # 直接初始化 MessagingApi
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # 儲存用戶 ID（用於推播）
@@ -61,22 +61,21 @@ def handle_message(event):
     else:
         reply_text = "滷小小聽不懂啦～請說『滷小小』、『任務』或『滷肉飯』來跟我互動吧！🍖"
 
-    with line_bot_api as api:
-        api.reply_message(
-            event.reply_token,
-            TextMessage(text=reply_text)
-        )
+    # 使用 MessagingApi 發送回覆訊息
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextMessage(text=reply_text)
+    )
 
 # 定時推播訊息
 def push_message():
     if user_ids:  # 確保有用戶 ID
         message = random.choice(funny_messages)  # 隨機選擇一條幽默訊息
-        with line_bot_api as api:
-            for user_id in user_ids:
-                api.push_message(
-                    user_id,
-                    TextMessage(text=message)
-                )
+        for user_id in user_ids:
+            line_bot_api.push_message(
+                user_id,
+                TextMessage(text=message)
+            )
 
 # 排程定時推播（每天 12:00 和 18:00 推播）
 schedule.every().day.at("12:00").do(push_message)
