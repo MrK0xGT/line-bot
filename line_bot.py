@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-from linebot.v3.messaging import MessagingApi, Configuration
+from linebot.v3.messaging import MessagingApi, Configuration, ReplyMessageRequest, PushMessageRequest
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
@@ -63,8 +63,10 @@ def handle_message(event):
 
     # 使用 MessagingApi 發送回覆訊息
     line_bot_api.reply_message(
-        reply_token=event.reply_token,
-        messages=[TextMessage(text=reply_text)]
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text=reply_text)]
+        )
     )
 
 # 定時推播訊息
@@ -73,8 +75,10 @@ def push_message():
         message = random.choice(funny_messages)  # 隨機選擇一條幽默訊息
         for user_id in user_ids:
             line_bot_api.push_message(
-                to=user_id,
-                messages=[TextMessage(text=message)]
+                PushMessageRequest(
+                    to=user_id,
+                    messages=[TextMessage(text=message)]
+                )
             )
 
 # 排程定時推播（每天 12:00 和 18:00 推播）
