@@ -7,8 +7,13 @@ import time
 import threading
 import random
 import os
+import logging
 
 app = Flask(__name__)
+
+# 設置日誌
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 從環境變數中獲取 Channel Access Token 和 Channel Secret
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "your_channel_access_token")
@@ -33,12 +38,18 @@ funny_messages = [
 # Webhook 路由，用於接收 Line 訊息
 @app.route("/callback", methods=['POST'])
 def callback():
-    signature = request.headers['X-Line-Signature']
+    signature = request.headers.get('X-Line-Signature', '')
     body = request.get_data(as_text=True)
+    logger.info(f"Received webhook request with body: {body}")
+    logger.info(f"Signature: {signature}")
     try:
         handler.handle(body, signature)
-    except InvalidSignatureError:
+    except InvalidSignatureError as e:
+        logger.error(f"Invalid signature error: {str(e)}")
         abort(400)
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        abort(500)
     return 'OK'
 
 # 處理用戶發送的訊息
@@ -49,6 +60,7 @@ def handle_message(event):
         user_ids.append(user_id)  # 儲存用戶 ID 用於推播
 
     user_message = event.message.text.lower()
+    logger.info(f"Received message from user {user_id}: {user_message}")
     if "滷小 small" in user_message:
         reply_text = "我是滷小 SMALL！今天要一起完成什麼任務呢？😋 快告訴我吧～🍖"
     elif "任務" in user_message:
@@ -59,6 +71,7 @@ def handle_message(event):
         reply_text = "滷小 SMALL 聽不懂啦～請說『滷小 SMALL』、『任務』或『滷肉飯』來跟我互動吧！🍖"
 
     # 使用 LineBotApi 發送回覆訊息
+    logger.info(f"Replying to user {user_id} with: {reply_text}")
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply_text)
@@ -69,6 +82,7 @@ def push_message():
     if user_ids:  # 確保有用戶 ID
         message = random.choice(funny_messages)  # 隨機選擇一條幽默訊息
         for user_id in user_ids:
+            logger.info(f"Pushing message to user {user_id}: {message}")
             line_bot_api.push_message(
                 user_id,
                 TextSendMessage(text=message)
